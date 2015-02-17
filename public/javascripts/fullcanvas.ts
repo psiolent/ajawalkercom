@@ -57,6 +57,7 @@ module FullCanvas {
 			this._timestamp = Date.now();
 			var self:Controller = this;
 			window.setInterval(() => self.render(), 30);
+			window.onresize = () => self.resizeCanvas();
 		}
 
 		/**

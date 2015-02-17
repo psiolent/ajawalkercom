@@ -50,6 +50,7 @@ var FullCanvas;
             this._timestamp = Date.now();
             var self = this;
             window.setInterval(function () { return self.render(); }, 30);
+            window.onresize = function () { return self.resizeCanvas(); };
         };
         /**
          * Resize the canvas to the window size
