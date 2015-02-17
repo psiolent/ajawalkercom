@@ -3,47 +3,79 @@
 module Grow {
 
 	/**
-	 * A factor to multiply by interval before using in calculations.
+	 * A factor to multiply by interval before using in calculations.  Determines how
+	 * quickly the growth takes place.
 	 * @type {number}
 	 */
-	var intervalFactor:number = 1 / 30;
+	var INTERVAL_FACTOR:number = 1 / 50;
 
 	/**
-	 * Controls the rate at which sticks and fruit wither away.
+	 * Controls the rate at which sticks and fruit wither away.  This value increases
+	 * as the growth progresses.
 	 * @type {number}
 	 */
-	var witherRate:number = 0.00001;
+	var WITHER_RATE:number = 0.00001;
+
+	/**
+	 * Determines the maximum wither rate before the wither rate stops increasing.
+	 * @type {number}
+	 */
+	var MAX_WITHER_RATE:number = 0.1;
+
+	/**
+	 * Determines how quickly the wither rate increases to its maximum.
+	 * @type {number}
+	 */
+	var WITHER_RATE_MULTIPLIER = 1.004;
 
 	/**
 	 * The final length of a withered stick.
 	 * @type {number}
 	 */
-	var witherLength:number = 4;
+	var WITHER_LENGTH:number = 4;
 
 	/**
 	 * The final angle (positive or negative) of a withered stick.
 	 * @type {number}
 	 */
-	var stickWitherAngle:number = Math.PI / 3;
+	var STICK_WITHER_ANGLE:number = Math.PI / 3;
+
+	/**
+	 * The target radius of a ripe fruit.
+	 * @type {number}
+	 */
+	var TARGET_FRUIT_RADIUS:number = 4;
+
+	/**
+	 * The final radius of a withered fruit.
+	 * @type {number}
+	 */
+	var WITHER_FRUIT_RADIUS:number = 2;
 
 	/**
 	 * The probability of multiple branches occurring at a branch point. This
 	 * probability will decrease to zero a the maximum stick depth is approached.
 	 * @type {number}
 	 */
-	var branchProbability:number = 0.07;
+	var BRANCH_PROBABILITY:number = 0.06;
+
+	/**
+	 * The amount that branches curve.
+	 * @type {number}
+	 */
+	var BRANCH_CURVE:number = 0.5;
 
 	/**
 	 * The maximum depth of sticks on a branch before fruiting.
 	 * @type {number}
 	 */
-	var maxStickDepth:number = 100;
+	var MAX_STICK_DEPTH:number = 100;
 
 	/**
 	 * The amount of randomization to do in the randomize() function.
 	 * @type {number}
 	 */
-	var randomizeFactor:number = 0.05;
+	var RANDOMIZE_FACTOR:number = 0.05;
 
 	/**
 	 * Randomize a number by scaling up or down by randomize factor.
@@ -51,7 +83,7 @@ module Grow {
 	 * @returns {number} the randomized number
 	 */
 	function r(n:number):number {
-		return n * (Math.random() * 2 * randomizeFactor + 1 - randomizeFactor);
+		return n * (Math.random() * 2 * RANDOMIZE_FACTOR + 1 - RANDOMIZE_FACTOR);
 	}
 
 	/**
@@ -69,20 +101,95 @@ module Grow {
 		return angle;
 	}
 
+	/**
+	 * Functionality for an individual branch.
+	 */
 	interface Branch {
+
+		/**
+		 * Grow the branch.
+		 * @param interval the interval of time passed since it last grew.
+		 * @param stack the stack of branches remaining to be grown; this
+		 * method should push any child branches onto the stack
+		 */
 		grow(interval:number, stack:Array<Branch>):void;
-		draw(ctx:CanvasRenderingContext2D, width:number, height:number, startx:number, starty:number, refAngle:number, stack:Array<Branch>);
+
+		/**
+		 * Draw the branch.
+		 * @param ctx the 2d canvas context to use to draw
+		 * @param width the width of the canvas
+		 * @param height the height of the canvas
+		 * @param startx the x coordinate where the branch should start drawing from
+		 * @param starty the y coordinate where the branch should start drawing from
+		 * @param refAngle the angle of the branch's parent
+		 * @param stack the stack of branch contexts remaining to be draw; this method
+		 * should push a branch context onto the stack for any child branches
+		 */
+		draw(ctx:CanvasRenderingContext2D, width:number, height:number, startx:number, starty:number, refAngle:number, stack:Array<BranchDrawContext>);
 	}
 
+	/**
+	 * A branch and its drawing context.
+	 */
+	class BranchDrawContext {
+
+		/**
+		 * The branch to be drawn.
+		 */
+		public branch:Branch;
+
+		/**
+		 * The x coordinate where the branch should draw from.
+		 */
+		public x:number;
+
+		/**
+		 * The y coordinate where the branch should draw from.
+		 */
+		public y:number;
+
+		/**
+		 * The reference angle the branch should draw from.
+		 */
+		public angle:number;
+
+		constructor(branch:Branch, x:number, y:number, angle:number) {
+			this.branch = branch;
+			this.x = x;
+			this.y = y;
+			this.angle = angle;
+		}
+	}
+
+	/**
+	 * A stick, which is a kind of branch.
+	 */
 	class Stick implements Branch {
+		// child branches
 		private _branches:Array<Branch> = [];
+
+		// current length of the branch
 		private _length:number = 0;
+
+		// current angle of the branch
 		private _angle:number = 0;
+
+		// how leafy (green) the branch is
 		private _leafiness:number = 1;
+
+		// the target length of the branch (before withering)
 		private _targetLength:number;
+
+		// the target angle of the branch (before withering)
 		private _targetAngle:number;
+
+		// how fast the branch should grow
 		private _growthRate: number;
+
+		// how deep this branch is (how many ancestors it has)
 		private _depth:number;
+
+		// the target angle of the branch (after withering)
 		private _witherAngle:number;
 
 		constructor(targetLength:number, targetAngle: number, growthRate: number, depth: number) {
@@ -90,275 +197,187 @@ module Grow {
 			this._targetAngle = r(targetAngle);
 			this._growthRate = r(growthRate);
 			this._depth = depth;
-			this._witherAngle = targetAngle > 0 ? stickWitherAngle : -stickWitherAngle;
+			this._witherAngle = this._targetAngle > 0 ? STICK_WITHER_ANGLE : -STICK_WITHER_ANGLE;
 		}
 
-		grow(interval:number, stack:Array<Branch>) {
-			interval *= intervalFactor;
+		public grow(interval:number, stack:Array<Branch>) {
+			// scale the interval
+			interval *= INTERVAL_FACTOR;
+
 			if (this._branches.length === 0) {
+				// now child branches, so keep growing
 				this._length += (this._targetLength - this._length) * this._growthRate * interval;
 				this._angle += (this._targetAngle - this._angle) * this._growthRate * interval;
 			} else {
-				this._length += (witherLength - this._length) * witherRate * interval;
-				this._angle += (this._witherAngle - this._angle) * witherRate * interval;
+				// we have child branches, so wither now
+				this._length += (WITHER_LENGTH - this._length) * WITHER_RATE * interval;
+				this._angle += (this._witherAngle - this._angle) * WITHER_RATE * interval;
 			}
+
 			if (this._branches.length === 0 && Math.pow((this._length / this._targetLength), 2) > Math.random()) {
-				if (this._depth < maxStickDepth) {
-					while ((this._branches.length === 0 || Math.random() > (1 - branchProbability) + (branchProbability * (this._depth / maxStickDepth)))) {
+				// looks like its time to spawn a child branch
+				if (this._depth < MAX_STICK_DEPTH) {
+					// child branch is a stick, or maybe multiple
+					while ((this._branches.length === 0 || Math.random() > (1 - BRANCH_PROBABILITY) + (BRANCH_PROBABILITY * (this._depth / MAX_STICK_DEPTH)))) {
 						this._branches.push(new Stick(
 							this._targetLength,
-							this._targetAngle,
+							Math.random() * 2 * BRANCH_CURVE - BRANCH_CURVE,
 							this._growthRate,
 							this._depth + 1));
 					}
 				} else {
+					// child branch is a fruit
 					this._branches.push(new Fruit(this._growthRate));
 				}
 			}
+
 			if (this._branches.length > 0) {
+				// decrease leafiness once we've got a child
 				this._leafiness *= (1 - 0.01 * interval);
 			}
+
 			this._branches.forEach(function(branch) {
+				// grow child branches
 				stack.push(branch);
 			});
 		}
 
-		this.draw = function(ctx, width, height, startx, starty, refAngle, stack) {
-			var drawAngle = normalizeAngle(refAngle + angle);
-			var endx = startx + Math.cos(drawAngle) * length;
-			var endy = starty + Math.sin(drawAngle) * length;
+		public draw(ctx:CanvasRenderingContext2D, width:number, height:number, startx:number, starty:number, refAngle:number, stack:Array<BranchDrawContext>) {
+			// draw x, y, and angle relative to reference coordinates and angle
+			var drawAngle = normalizeAngle(refAngle + this._angle);
+			var endx = startx + Math.cos(drawAngle) * this._length;
+			var endy = starty + Math.sin(drawAngle) * this._length;
+
+			// draw
 			ctx.beginPath();
 			ctx.moveTo(startx, height - starty);
 			ctx.lineTo(endx, height - endy);
-			ctx.strokeStyle = "rgb(0," + parseInt(leafiness * 200) + ",0)";
+
+			// green-ness depends on leafiness
+			ctx.strokeStyle = "rgb(0," + Math.floor(this._leafiness * 200) + ",0)";
 			ctx.stroke();
-			branches.forEach(function(branch) {
-				stack.push({
-					branch: branch,
-					x: endx,
-					y: endy,
-					angle: drawAngle
-				});
+
+			// draw children
+			this._branches.forEach(function(branch) {
+				stack.push(new BranchDrawContext(branch, endx, endy, drawAngle));
 			});
-		};
-	};
-
-	export class Client implements FullCanvas.Client {
-		init(width:number, height:number) {
-			// TODO
-		}
-
-		update(interval:number, width:number, height:number, mouse:FullCanvas.MouseState) {
-			// TODO
-		}
-
-		draw(ctx:CanvasRenderingContext2D, width:number, height:number, mouse:FullCanvas.MouseState) {
-			// TODO
 		}
 	}
 
+	/**
+	 * A fruit is at the very end of a branch sequence.
+	 */
+	class Fruit implements Branch {
+		// current radius of the fruit
+		private _radius:number = 0;
+
+		// how ripe the fruit is (determines its color)
+		private _ripeness:number = 1;
+
+		// whether the fruit is dying
+		private _dying:boolean = false;
+
+		// the target radius of the fruit when ripe
+		private _targetRadius:number;
+
+		// how fast the fruit is growing
+		private _growthRate:number;
+
+		constructor(growthRate:number) {
+			this._growthRate = r(growthRate);
+			this._targetRadius = r(TARGET_FRUIT_RADIUS);
+		}
+
+		grow(interval) {
+			// scale the interval
+			interval *= INTERVAL_FACTOR;
+
+			if (this._dying) {
+				// if dying, then we are withering and over-ripening
+				this._radius += (WITHER_FRUIT_RADIUS - this._radius) * WITHER_RATE * interval;
+				this._ripeness *= (1 - 0.01 * interval);
+			} else {
+				// if not dying then we are growing and ripening
+				this._radius += (TARGET_FRUIT_RADIUS - this._radius) * this._growthRate * interval;
+				this._ripeness *= (1 - 0.01 * interval);
+				if (this._ripeness < 0.01) {
+					// we've reached full ripeness, so start dying
+					this._dying = true;
+					this._ripeness = 1;
+				}
+			}
+		}
+
+		draw(ctx, width, height, x, y) {
+			// draw the fruit
+			ctx.beginPath();
+			ctx.arc(x, height - y, this._radius, 2 * Math.PI, false);
+			if (this._dying) {
+				// if dying, then become blacker as we over ripen
+				ctx.fillStyle = "rgb(" +
+				Math.floor(this._ripeness * 200) + "," +
+				"0," +
+				Math.floor(this._ripeness * 50) + ")";
+			} else {
+				// if not dying, then turn from green to red as ripening
+				ctx.fillStyle = "rgb(" +
+				Math.floor((1 - this._ripeness) * 200) + "," +
+				Math.floor(this._ripeness * 150) + "," +
+				Math.floor((1 - this._ripeness) * 50) + ")";
+			}
+			ctx.fill();
+		}
+	}
+
+	/**
+	 * Implements the FullCanvas.Client interfaces for a Grow animation.
+	 */
+	export class Client implements FullCanvas.Client {
+		// root trunk sticks drawing contexts
+		private _trunks:Array<BranchDrawContext> = [];
+
+		init(width:number, height:number) {
+			// init trunks
+			this._trunks.push(new BranchDrawContext(new Stick(6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2));
+			this._trunks.push(new BranchDrawContext(new Stick(6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2 - 2 * Math.PI / 3));
+			this._trunks.push(new BranchDrawContext(new Stick(6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2 + 2 * Math.PI / 3));
+		}
+
+		update(interval:number, width:number, height:number, mouse:FullCanvas.MouseState) {
+			// create our stack of branches to grow from our trunks
+			var stack:Array<Branch> = this._trunks.map((bc) => bc.branch);
+
+			// grow until nothing left
+			while (stack.length > 0) {
+				stack.shift().grow(interval, stack);
+			}
+
+			// increase wither rate as growth proceeds
+			if (WITHER_RATE < MAX_WITHER_RATE) {
+				WITHER_RATE *= WITHER_RATE_MULTIPLIER;
+			}
+		}
+
+		draw(ctx:CanvasRenderingContext2D, width:number, height:number, mouse:FullCanvas.MouseState) {
+			// update x and y for trunks to be in the center of the canvas
+			this._trunks.forEach((bc) => {
+				bc.x = width / 2;
+				bc.y = height / 2;
+			});
+
+			// create our stack of branches to draw from our trunks
+			var stack:Array<BranchDrawContext> = this._trunks.slice(0);
+
+			// draw until nothing left
+			while (stack.length > 0) {
+				var d = stack.shift();
+				d.branch.draw(ctx, width, height, d.x, d.y, d.angle, stack);
+			}
+		}
+	}
 }
 
-
-var Stick = function(targetLength, targetAngle, growthRate, depth) {
-    var branches = [];
-    var length = 0;
-    var angle = 0;
-    var leafiness = 1;
-
-    targetLength = r(targetLength);
-    targetAngle = r(targetAngle);
-    growthRate = r(growthRate);
-
-    var witherLength = 4;
-    var witherAngle = targetAngle > 0 ? Math.PI / 3 : -Math.PI / 3;
-
-    this.grow = function(interval, stack) {
-        interval = interval / 30;
-        if (branches.length === 0) {
-            length += (targetLength - length) * growthRate * interval;
-            angle += (targetAngle - angle) * growthRate * interval;
-        } else {
-            length += (witherLength - length) * witherRate * interval;
-            angle += (witherAngle - angle) * witherRate * interval;
-        }
-        if (branches.length === 0 && Math.pow((length / targetLength), 2) > Math.random()) {
-            if (depth < 100) {
-                while ((branches.length === 0 || Math.random() > 0.93 + 0.07 * (depth / 100))) {
-                    branches.push(new Stick(
-                        targetLength,
-                        Math.random() * 0.2 - 0.1,
-                        growthRate,
-                        depth + 1));
-                }
-            } else {
-                branches.push(new Fruit(growthRate));
-            }
-        }
-        if (branches.length > 0) {
-            leafiness *= (1 - 0.01 * interval);
-        }
-        branches.forEach(function(branch) {
-            stack.push(branch);
-        });
-    };
-
-    this.draw = function(ctx, width, height, startx, starty, refAngle, stack) {
-        var drawAngle = normalizeAngle(refAngle + angle);
-        var endx = startx + Math.cos(drawAngle) * length;
-        var endy = starty + Math.sin(drawAngle) * length;
-        ctx.beginPath();
-        ctx.moveTo(startx, height - starty);
-        ctx.lineTo(endx, height - endy);
-        ctx.strokeStyle = "rgb(0," + parseInt(leafiness * 200) + ",0)";
-        ctx.stroke();
-        branches.forEach(function(branch) {
-            stack.push({
-                branch: branch,
-                x: endx,
-                y: endy,
-                angle: drawAngle
-            });
-        });
-    };
+// start growing when everything is loaded
+window.onload = () => {
+	new FullCanvas.Controller(<HTMLCanvasElement>document.getElementById("full-canvas"), new Grow.Client()).start();
 };
-
-var Fruit = function(growthRate) {
-    var targetRadius = 4;
-    var radius = 0;
-    var ripeness = 1;
-    var dying = false;
-
-    targetRadius = r(targetRadius);
-    growthRate = r(growthRate);
-
-    var witherRadius = 2;
-
-    this.grow = function(interval) {
-        interval = interval / 30;
-        if (dying) {
-            radius += (witherRadius - radius) * witherRate * interval;
-            ripeness *= (1 - 0.01 * interval);
-        } else {
-            radius += (targetRadius - radius) * growthRate * interval;
-            ripeness *= (1 - 0.01 * interval);
-            if (ripeness < 0.01) {
-                dying = true;
-                ripeness = 1;
-            }
-        }
-    };
-
-    this.draw = function(ctx, width, height, x, y) {
-        ctx.beginPath();
-        ctx.arc(x, height - y, radius, 2 * Math.PI, false);
-        if (dying) {
-            ctx.fillStyle = "rgb(" +
-            parseInt(ripeness * 200) + "," +
-            "0," +
-            parseInt(ripeness * 50) + ")";
-        } else {
-            ctx.fillStyle = "rgb(" +
-            parseInt((1 - ripeness) * 200) + "," +
-            parseInt(ripeness * 150) + "," +
-            parseInt((1 - ripeness) * 50) + ")";
-        }
-        ctx.fill();
-    };
-};
-
-var trunks;
-
-function init(width, height) {
-    trunks = [
-        {
-            branch: new Stick(6, 0, 0.1, 0),
-            x: width / 2,
-            y: height / 2,
-            angle: Math.PI / 2
-        },
-        {
-            branch: new Stick(6, 0, 0.1, 0),
-            x: width / 2,
-            y: height / 2,
-            angle: Math.PI / 2 - 2 * Math.PI / 3
-        },
-        {
-            branch: new Stick(6, 0, 0.1, 0),
-            x: width / 2,
-            y: height / 2,
-            angle: Math.PI / 2 + 2 * Math.PI / 3
-        }
-    ];
-}
-
-function drawFrame(ctx, width, height, interval, mouse) {
-    var stack = trunks.map(function(trunk) { return trunk.branch; });
-    while (stack.length > 0) {
-        stack.shift().grow(interval, stack);
-    }
-    stack = trunks.map(function(trunk) {
-        trunk.x = width / 2;
-        trunk.y = height / 2;
-        return trunk;
-    });
-    while (stack.length > 0) {
-        var d = stack.shift();
-        d.branch.draw(ctx, width, height, d.x, d.y, d.angle, stack);
-    }
-    if (witherRate < 0.5) {
-        witherRate *= 1.005;
-    }
-}
-
-(function() {
-    var canvas = document.getElementById("canvas-full");
-    var ctx = null;
-
-    var mouse = {
-        x: 0,
-        y: 0,
-        down: false
-    }
-    canvas.addEventListener("mousemove", function(event) {
-        var rect = canvas.getBoundingClientRect();
-        mouse.x = event.clientX - rect.left;
-        mouse.y = event.clientY - rect.top;
-        run();
-    }, false);
-
-    canvas.addEventListener("mousedown", function(event) {
-        mouse.down = true;
-        run();
-    }, false);
-
-    canvas.addEventListener("mouseup", function(event) {
-        mouse.down = false;
-        run();
-    }, false);
-
-    var resizeCanvas = function() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        ctx = canvas.getContext("2d");
-    };
-
-    var stamp = Date.now() - 30;
-    var run = function() {
-        var now = Date.now();
-        var interval = now - stamp;
-        stamp = now;
-        if (interval < 0) interval = 0;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawFrame(ctx, canvas.width, canvas.height, interval, mouse);
-    };
-
-    init(canvas.width, canvas.height);
-
-    window.onresize = resizeCanvas;
-
-    window.onload = function() {
-        resizeCanvas();
-        setInterval(run, 30);
-    };
-})();
