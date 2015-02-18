@@ -7,6 +7,6 @@ html
         canvas#full-canvas
         script(type='text/javascript' src='/js/lib/require.js')
         script.
-            require(["/js/fullcanvas.js", "/js/#{script}.js"], function (fc, client) {
-                new fc.Controller(document.getElementById("full-canvas"), new client.createClientFactory().create()).start();
+            require(["/js/fullcanvas.js", "/js/#{script}.js"], function (FullCanvas, Client) {
+                new FullCanvas.Controller(document.getElementById("full-canvas"), new Client.createClientFactory().create()).start();
             });
