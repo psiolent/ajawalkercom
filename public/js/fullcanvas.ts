@@ -120,6 +120,13 @@ module FullCanvas {
 	}
 
 	/**
+	 * Interface for a full canvas controller client factory.
+	 */
+	export interface ClientFactory {
+		create():Client;
+	}
+
+	/**
 	 * Encapsulates the state of the mouse.
 	 */
 	export class MouseState {
@@ -139,3 +146,5 @@ module FullCanvas {
 		public down:boolean;
 	}
 }
+
+export = FullCanvas;

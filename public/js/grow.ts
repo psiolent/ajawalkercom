@@ -1,75 +1,6 @@
-/// <reference path="fullcanvas.ts" />
+import FullCanvas = require("./fullcanvas");
 
 module Grow {
-
-	/**
-	 * A factor to multiply by interval before using in calculations.  Determines how
-	 * quickly the growth takes place.
-	 * @type {number}
-	 */
-	var INTERVAL_FACTOR:number = 1 / 50;
-
-	/**
-	 * Controls the rate at which sticks and fruit wither away.  This value increases
-	 * as the growth progresses.
-	 * @type {number}
-	 */
-	var WITHER_RATE:number = 0.00001;
-
-	/**
-	 * Determines the maximum wither rate before the wither rate stops increasing.
-	 * @type {number}
-	 */
-	var MAX_WITHER_RATE:number = 0.1;
-
-	/**
-	 * Determines how quickly the wither rate increases to its maximum.
-	 * @type {number}
-	 */
-	var WITHER_RATE_MULTIPLIER = 1.004;
-
-	/**
-	 * The final length of a withered stick.
-	 * @type {number}
-	 */
-	var WITHER_LENGTH:number = 4;
-
-	/**
-	 * The final angle (positive or negative) of a withered stick.
-	 * @type {number}
-	 */
-	var STICK_WITHER_ANGLE:number = Math.PI / 3;
-
-	/**
-	 * The target radius of a ripe fruit.
-	 * @type {number}
-	 */
-	var TARGET_FRUIT_RADIUS:number = 4;
-
-	/**
-	 * The final radius of a withered fruit.
-	 * @type {number}
-	 */
-	var WITHER_FRUIT_RADIUS:number = 2;
-
-	/**
-	 * The probability of multiple branches occurring at a branch point. This
-	 * probability will decrease to zero a the maximum stick depth is approached.
-	 * @type {number}
-	 */
-	var BRANCH_PROBABILITY:number = 0.06;
-
-	/**
-	 * The amount that branches curve.
-	 * @type {number}
-	 */
-	var BRANCH_CURVE:number = 0.5;
-
-	/**
-	 * The maximum depth of sticks on a branch before fruiting.
-	 * @type {number}
-	 */
-	var MAX_STICK_DEPTH:number = 100;
 
 	/**
 	 * The amount of randomization to do in the randomize() function.
@@ -82,7 +13,7 @@ module Grow {
 	 * @param n the number to randomize
 	 * @returns {number} the randomized number
 	 */
-	function r(n:number):number {
+	function randomize(n:number):number {
 		return n * (Math.random() * 2 * RANDOMIZE_FACTOR + 1 - RANDOMIZE_FACTOR);
 	}
 
@@ -99,6 +30,81 @@ module Grow {
 			angle -= 2 * Math.PI;
 		}
 		return angle;
+	}
+
+	/**
+	 * The environment in which growth occurs.
+	 */
+	class Environment {
+		/**
+		 * A factor to multiply by interval before using in calculations.  Determines how
+		 * quickly the growth takes place.
+		 * @type {number}
+		 */
+		public INTERVAL_FACTOR:number = 1 / 50;
+
+		/**
+		 * Controls the rate at which sticks and fruit wither away.  This value increases
+		 * as the growth progresses.
+		 * @type {number}
+		 */
+		public WITHER_RATE:number = 0.00001;
+
+		/**
+		 * Determines the maximum wither rate before the wither rate stops increasing.
+		 * @type {number}
+		 */
+		public MAX_WITHER_RATE:number = 0.1;
+
+		/**
+		 * Determines how quickly the wither rate increases to its maximum.
+		 * @type {number}
+		 */
+		public WITHER_RATE_MULTIPLIER = 1.004;
+
+		/**
+		 * The final length of a withered stick.
+		 * @type {number}
+		 */
+		public WITHER_LENGTH:number = 4;
+
+		/**
+		 * The final angle (positive or negative) of a withered stick.
+		 * @type {number}
+		 */
+		public STICK_WITHER_ANGLE:number = Math.PI / 3;
+
+		/**
+		 * The target radius of a ripe fruit.
+		 * @type {number}
+		 */
+		public TARGET_FRUIT_RADIUS:number = 4;
+
+		/**
+		 * The final radius of a withered fruit.
+		 * @type {number}
+		 */
+		public WITHER_FRUIT_RADIUS:number = 0;
+
+		/**
+		 * The probability of multiple branches occurring at a branch point. This
+		 * probability will decrease to zero a the maximum stick depth is approached.
+		 * @type {number}
+		 */
+		public BRANCH_PROBABILITY:number = 0.08;
+
+		/**
+		 * The amount that branches curve.
+		 * @type {number}
+		 */
+		public BRANCH_CURVE:number = 1.0;
+
+		/**
+		 * The maximum depth of sticks on a branch before fruiting.
+		 * @type {number}
+		 */
+		public MAX_STICK_DEPTH:number = 80;
+
 	}
 
 	/**
@@ -165,6 +171,9 @@ module Grow {
 	 * A stick, which is a kind of branch.
 	 */
 	class Stick implements Branch {
+		// growth environment
+		private _env:Environment;
+
 		// child branches
 		private _branches:Array<Branch> = [];
 
@@ -192,17 +201,18 @@ module Grow {
 		// the target angle of the branch (after withering)
 		private _witherAngle:number;
 
-		constructor(targetLength:number, targetAngle: number, growthRate: number, depth: number) {
-			this._targetLength = r(targetLength);
-			this._targetAngle = r(targetAngle);
-			this._growthRate = r(growthRate);
+		constructor(env:Environment, targetLength:number, targetAngle: number, growthRate: number, depth: number) {
+			this._env = env;
+			this._targetLength = randomize(targetLength);
+			this._targetAngle = randomize(targetAngle);
+			this._growthRate = randomize(growthRate);
 			this._depth = depth;
-			this._witherAngle = this._targetAngle > 0 ? STICK_WITHER_ANGLE : -STICK_WITHER_ANGLE;
+			this._witherAngle = this._targetAngle > 0 ? this._env.STICK_WITHER_ANGLE : -this._env.STICK_WITHER_ANGLE;
 		}
 
 		public grow(interval:number, stack:Array<Branch>) {
 			// scale the interval
-			interval *= INTERVAL_FACTOR;
+			interval *= this._env.INTERVAL_FACTOR;
 
 			if (this._branches.length === 0) {
 				// now child branches, so keep growing
@@ -210,24 +220,25 @@ module Grow {
 				this._angle += (this._targetAngle - this._angle) * this._growthRate * interval;
 			} else {
 				// we have child branches, so wither now
-				this._length += (WITHER_LENGTH - this._length) * WITHER_RATE * interval;
-				this._angle += (this._witherAngle - this._angle) * WITHER_RATE * interval;
+				this._length += (this._env.WITHER_LENGTH - this._length) * this._env.WITHER_RATE * interval;
+				this._angle += (this._witherAngle - this._angle) * this._env.WITHER_RATE * interval;
 			}
 
 			if (this._branches.length === 0 && Math.pow((this._length / this._targetLength), 2) > Math.random()) {
 				// looks like its time to spawn a child branch
-				if (this._depth < MAX_STICK_DEPTH) {
+				if (this._depth < this._env.MAX_STICK_DEPTH) {
 					// child branch is a stick, or maybe multiple
-					while ((this._branches.length === 0 || Math.random() > (1 - BRANCH_PROBABILITY) + (BRANCH_PROBABILITY * (this._depth / MAX_STICK_DEPTH)))) {
+					while ((this._branches.length === 0 || Math.random() > (1 - this._env.BRANCH_PROBABILITY) + (this._env.BRANCH_PROBABILITY * (this._depth / this._env.MAX_STICK_DEPTH)))) {
 						this._branches.push(new Stick(
+							this._env,
 							this._targetLength,
-							Math.random() * 2 * BRANCH_CURVE - BRANCH_CURVE,
+							Math.random() * 2 * this._env.BRANCH_CURVE - this._env.BRANCH_CURVE,
 							this._growthRate,
 							this._depth + 1));
 					}
 				} else {
 					// child branch is a fruit
-					this._branches.push(new Fruit(this._growthRate));
+					this._branches.push(new Fruit(this._env, this._growthRate));
 				}
 			}
 
@@ -268,6 +279,9 @@ module Grow {
 	 * A fruit is at the very end of a branch sequence.
 	 */
 	class Fruit implements Branch {
+		// growth environment
+		private _env:Environment;
+
 		// current radius of the fruit
 		private _radius:number = 0;
 
@@ -283,22 +297,23 @@ module Grow {
 		// how fast the fruit is growing
 		private _growthRate:number;
 
-		constructor(growthRate:number) {
-			this._growthRate = r(growthRate);
-			this._targetRadius = r(TARGET_FRUIT_RADIUS);
+		constructor(env:Environment, growthRate:number) {
+			this._env = env;
+			this._growthRate = randomize(growthRate);
+			this._targetRadius = randomize(this._env.TARGET_FRUIT_RADIUS);
 		}
 
 		grow(interval) {
 			// scale the interval
-			interval *= INTERVAL_FACTOR;
+			interval *= this._env.INTERVAL_FACTOR;
 
 			if (this._dying) {
 				// if dying, then we are withering and over-ripening
-				this._radius += (WITHER_FRUIT_RADIUS - this._radius) * WITHER_RATE * interval;
+				this._radius += (this._env.WITHER_FRUIT_RADIUS - this._radius) * this._env.WITHER_RATE * interval;
 				this._ripeness *= (1 - 0.01 * interval);
 			} else {
 				// if not dying then we are growing and ripening
-				this._radius += (TARGET_FRUIT_RADIUS - this._radius) * this._growthRate * interval;
+				this._radius += (this._env.TARGET_FRUIT_RADIUS - this._radius) * this._growthRate * interval;
 				this._ripeness *= (1 - 0.01 * interval);
 				if (this._ripeness < 0.01) {
 					// we've reached full ripeness, so start dying
@@ -336,11 +351,14 @@ module Grow {
 		// root trunk sticks drawing contexts
 		private _trunks:Array<BranchDrawContext> = [];
 
+		// growth environment
+		private _env:Environment = new Environment();
+
 		init(width:number, height:number) {
 			// init trunks
-			this._trunks.push(new BranchDrawContext(new Stick(6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2));
-			this._trunks.push(new BranchDrawContext(new Stick(6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2 - 2 * Math.PI / 3));
-			this._trunks.push(new BranchDrawContext(new Stick(6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2 + 2 * Math.PI / 3));
+			this._trunks.push(new BranchDrawContext(new Stick(this._env, 6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2));
+			this._trunks.push(new BranchDrawContext(new Stick(this._env, 6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2 - 2 * Math.PI / 3));
+			this._trunks.push(new BranchDrawContext(new Stick(this._env, 6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2 + 2 * Math.PI / 3));
 		}
 
 		update(interval:number, width:number, height:number, mouse:FullCanvas.MouseState) {
@@ -353,8 +371,8 @@ module Grow {
 			}
 
 			// increase wither rate as growth proceeds
-			if (WITHER_RATE < MAX_WITHER_RATE) {
-				WITHER_RATE *= WITHER_RATE_MULTIPLIER;
+			if (this._env.WITHER_RATE < this._env.MAX_WITHER_RATE) {
+				this._env.WITHER_RATE *= this._env.WITHER_RATE_MULTIPLIER;
 			}
 		}
 
@@ -375,9 +393,19 @@ module Grow {
 			}
 		}
 	}
+
+	/**
+	 * A factory for our grow clients.
+	 */
+	export class ClientFactory implements FullCanvas.ClientFactory {
+		create():Client {
+			return new Client();
+		}
+	}
+
+	export function createClientFactory():ClientFactory {
+		return new ClientFactory();
+	}
 }
 
-// start growing when everything is loaded
-window.onload = () => {
-	new FullCanvas.Controller(<HTMLCanvasElement>document.getElementById("full-canvas"), new Grow.Client()).start();
-};
+export = Grow;
