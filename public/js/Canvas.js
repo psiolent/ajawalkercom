@@ -1,69 +1,59 @@
 define(["require", "exports"], function (require, exports) {
     /**
-     * Provides a full-window canvas with a rendering loop.
+     * Provides canvas control and usage functionality.
      */
-    var FullCanvas;
-    (function (FullCanvas) {
+    var Canvas;
+    (function (Canvas) {
         /**
-         * A controller for a full canvas. Manages sizing the canvas to full window size
-         * and invoking client methods from the render loop.
+         * Provides a render loop for a canvas.
          */
-        var Controller = (function () {
+        var RenderLoop = (function () {
             /**
              * Create a new full canvas controller.
              * @param canvas the canvas element to control
              * @param client the client of the full canvas controller
              */
-            function Controller(canvas, client) {
+            function RenderLoop(canvas, client) {
                 this._mouse = new MouseState();
                 this._started = false;
                 this._canvas = canvas;
                 this._client = client;
                 // save this
                 var self = this;
-                // render mouse state on mouse move
+                // update mouse state on mouse move and re-render
                 this._canvas.addEventListener("mousemove", function (event) {
                     var rect = self._canvas.getBoundingClientRect();
                     self._mouse.x = event.clientX - rect.left;
                     self._mouse.y = event.clientY - rect.top;
                     self.render();
                 }, false);
-                // render mouse state on mouse down
+                // update mouse state on mouse down and re-render
                 this._canvas.addEventListener("mousedown", function () {
                     self._mouse.down = true;
                     self.render();
                 }, false);
-                // render mouse state on mouse up
+                // update mouse state on mouse up and re-render
                 this._canvas.addEventListener("mouseup", function () {
                     self._mouse.down = false;
                     self.render();
                 }, false);
             }
             /**
-             * Start the controller. Will throw an exception if called after already started.
+             * Start the render loop. Will throw an exception if called after already started.
              */
-            Controller.prototype.start = function () {
+            RenderLoop.prototype.start = function () {
                 if (this._started)
                     throw "already started";
                 this._started = true;
-                this.resizeCanvas();
                 this._client.init(this._canvas.width, this._canvas.height);
                 this._timestamp = Date.now();
                 var self = this;
                 window.setInterval(function () { return self.render(); }, 30);
-                window.onresize = function () { return self.resizeCanvas(); };
-            };
-            /**
-             * Resize the canvas to the window size
-             */
-            Controller.prototype.resizeCanvas = function () {
-                this._canvas.width = window.innerWidth;
-                this._canvas.height = window.innerHeight;
             };
             /**
              * Runs a render loop cycle.
              */
-            Controller.prototype.render = function () {
+            RenderLoop.prototype.render = function () {
                 // see how much time has passed since last render cycle
                 var now = Date.now();
                 var interval = now - this._timestamp;
@@ -79,9 +69,22 @@ define(["require", "exports"], function (require, exports) {
                 ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
                 this._client.draw(ctx, this._canvas.width, this._canvas.height, this._mouse);
             };
-            return Controller;
+            return RenderLoop;
         })();
-        FullCanvas.Controller = Controller;
+        Canvas.RenderLoop = RenderLoop;
+        /**
+         * Keeps the provided canvas fully sized to the window.
+         * @param canvas the canvas to keep full size
+         */
+        function keepFullSize(canvas) {
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.onresize = resize;
+            resize();
+        }
+        Canvas.keepFullSize = keepFullSize;
         /**
          * Encapsulates the state of the mouse.
          */
@@ -90,8 +93,8 @@ define(["require", "exports"], function (require, exports) {
             }
             return MouseState;
         })();
-        FullCanvas.MouseState = MouseState;
-    })(FullCanvas || (FullCanvas = {}));
-    return FullCanvas;
+        Canvas.MouseState = MouseState;
+    })(Canvas || (Canvas = {}));
+    return Canvas;
 });
-//# sourceMappingURL=fullcanvas.js.map
+//# sourceMappingURL=Canvas.js.map

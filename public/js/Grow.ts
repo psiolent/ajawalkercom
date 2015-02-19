@@ -1,4 +1,4 @@
-import FullCanvas = require("./fullcanvas");
+import Canvas = require("./Canvas");
 
 module Grow {
 
@@ -345,9 +345,9 @@ module Grow {
 	}
 
 	/**
-	 * Implements the FullCanvas.Client interfaces for a Grow animation.
+	 * Implements the Canvas.RenderClient interfaces for a Grow animation.
 	 */
-	export class Client implements FullCanvas.Client {
+	export class Client implements Canvas.RenderClient {
 		// root trunk sticks drawing contexts
 		private _trunks:Array<BranchDrawContext> = [];
 
@@ -361,7 +361,7 @@ module Grow {
 			this._trunks.push(new BranchDrawContext(new Stick(this._env, 6, 0, 0.1, 0), width / 2, height / 2, Math.PI / 2 + 2 * Math.PI / 3));
 		}
 
-		update(interval:number, width:number, height:number, mouse:FullCanvas.MouseState) {
+		update(interval:number, width:number, height:number, mouse:Canvas.MouseState) {
 			// create our stack of branches to grow from our trunks
 			var stack:Array<Branch> = this._trunks.map((bc) => bc.branch);
 
@@ -376,7 +376,7 @@ module Grow {
 			}
 		}
 
-		draw(ctx:CanvasRenderingContext2D, width:number, height:number, mouse:FullCanvas.MouseState) {
+		draw(ctx:CanvasRenderingContext2D, width:number, height:number, mouse:Canvas.MouseState) {
 			// update x and y for trunks to be in the center of the canvas
 			this._trunks.forEach((bc) => {
 				bc.x = width / 2;
@@ -394,17 +394,8 @@ module Grow {
 		}
 	}
 
-	/**
-	 * A factory for our grow clients.
-	 */
-	export class ClientFactory implements FullCanvas.ClientFactory {
-		create():Client {
-			return new Client();
-		}
-	}
-
-	export function createClientFactory():ClientFactory {
-		return new ClientFactory();
+	export function createRenderClient():Canvas.RenderClient {
+		return new Client();
 	}
 }
 

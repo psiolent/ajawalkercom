@@ -1,14 +1,13 @@
 /**
- * Provides a full-window canvas with a rendering loop.
+ * Provides canvas control and usage functionality.
  */
-module FullCanvas {
+module Canvas {
 	/**
-	 * A controller for a full canvas. Manages sizing the canvas to full window size
-	 * and invoking client methods from the render loop.
+	 * Provides a render loop for a canvas.
 	 */
-	export class Controller {
+	export class RenderLoop {
 		private _canvas:HTMLCanvasElement;
-		private _client:Client;
+		private _client:RenderClient;
 		private _mouse:MouseState = new MouseState();
 		private _started:boolean = false;
 		private _timestamp:number;
@@ -18,14 +17,14 @@ module FullCanvas {
 		 * @param canvas the canvas element to control
 		 * @param client the client of the full canvas controller
 		 */
-		constructor(canvas:HTMLCanvasElement, client:Client) {
+		constructor(canvas:HTMLCanvasElement, client:RenderClient) {
 			this._canvas = canvas;
 			this._client = client;
 
 			// save this
-			var self:Controller = this;
+			var self:RenderLoop = this;
 
-			// render mouse state on mouse move
+			// update mouse state on mouse move and re-render
 			this._canvas.addEventListener("mousemove", function (event:MouseEvent) {
 				var rect = self._canvas.getBoundingClientRect();
 				self._mouse.x = event.clientX - rect.left;
@@ -33,13 +32,13 @@ module FullCanvas {
 				self.render();
 			}, false);
 
-			// render mouse state on mouse down
+			// update mouse state on mouse down and re-render
 			this._canvas.addEventListener("mousedown", function () {
 				self._mouse.down = true;
 				self.render();
 			}, false);
 
-			// render mouse state on mouse up
+			// update mouse state on mouse up and re-render
 			this._canvas.addEventListener("mouseup", function () {
 				self._mouse.down = false;
 				self.render();
@@ -47,25 +46,15 @@ module FullCanvas {
 		}
 
 		/**
-		 * Start the controller. Will throw an exception if called after already started.
+		 * Start the render loop. Will throw an exception if called after already started.
 		 */
 		public start():void {
 			if (this._started) throw "already started";
 			this._started = true;
-			this.resizeCanvas();
 			this._client.init(this._canvas.width, this._canvas.height);
 			this._timestamp = Date.now();
-			var self:Controller = this;
+			var self:RenderLoop = this;
 			window.setInterval(() => self.render(), 30);
-			window.onresize = () => self.resizeCanvas();
-		}
-
-		/**
-		 * Resize the canvas to the window size
-		 */
-		private resizeCanvas():void {
-			this._canvas.width = window.innerWidth;
-			this._canvas.height = window.innerHeight;
 		}
 
 		/**
@@ -90,9 +79,9 @@ module FullCanvas {
 	}
 
 	/**
-	 * The interface for clients of the full canvas controller.
+	 * The interface for clients which use a render loop.
 	 */
-	export interface Client {
+	export interface RenderClient {
 		/**
 		 * Called once after initializing canvas and before starting the render loop.
 		 * @param width the width of the canvas
@@ -120,10 +109,16 @@ module FullCanvas {
 	}
 
 	/**
-	 * Interface for a full canvas controller client factory.
+	 * Keeps the provided canvas fully sized to the window.
+	 * @param canvas the canvas to keep full size
 	 */
-	export interface ClientFactory {
-		create():Client;
+	export function keepFullSize(canvas:HTMLCanvasElement) {
+		function resize() {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+		}
+		window.onresize = resize;
+		resize();
 	}
 
 	/**
@@ -147,4 +142,4 @@ module FullCanvas {
 	}
 }
 
-export = FullCanvas;
+export = Canvas;

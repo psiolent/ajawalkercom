@@ -230,7 +230,7 @@ define(["require", "exports"], function (require, exports) {
             return Fruit;
         })();
         /**
-         * Implements the FullCanvas.Client interfaces for a Grow animation.
+         * Implements the Canvas.RenderClient interfaces for a Grow animation.
          */
         var Client = (function () {
             function Client() {
@@ -272,23 +272,11 @@ define(["require", "exports"], function (require, exports) {
             return Client;
         })();
         Grow.Client = Client;
-        /**
-         * A factory for our grow clients.
-         */
-        var ClientFactory = (function () {
-            function ClientFactory() {
-            }
-            ClientFactory.prototype.create = function () {
-                return new Client();
-            };
-            return ClientFactory;
-        })();
-        Grow.ClientFactory = ClientFactory;
-        function createClientFactory() {
-            return new ClientFactory();
+        function createRenderClient() {
+            return new Client();
         }
-        Grow.createClientFactory = createClientFactory;
+        Grow.createRenderClient = createRenderClient;
     })(Grow || (Grow = {}));
     return Grow;
 });
-//# sourceMappingURL=grow.js.map
+//# sourceMappingURL=Grow.js.map
